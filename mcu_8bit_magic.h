@@ -1,8 +1,6 @@
 #ifndef _mcu_8bit_magic_
 #define _mcu_8bit_magic_
 
-#include "lcd_mode.h"
-
 #define DELAY7        \
   asm volatile(       \
     "rjmp .+0" "\n\t" \
@@ -289,9 +287,9 @@
  #endif
  
 #else
-
+#ifndef ESP32
  #error "Board type unsupported / not recognized"
-
+#endif
 #endif
 
 #if !defined(__SAM3X8E__)
@@ -332,9 +330,9 @@
 #define write16(d) { uint8_t h = (d)>>8, l = d; write8(h); write8(l); }
 #define read16(dst) { uint8_t hi; read8(hi); read8(dst); dst |= (hi << 8); }
 #define writeCmd8(x){ CD_COMMAND; write8(x); CD_DATA;  }
-#define writeData8(x){  write8(x) }
+#define writeData8(x){  write8(x); }
 #define writeCmd16(x){ CD_COMMAND; write16(x); CD_DATA; }
-#define writeData16(x){ write16(x) }
+#define writeData16(x){ write16(x); }
 
 
 

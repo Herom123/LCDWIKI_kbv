@@ -9,7 +9,122 @@
     "nop"      "\n"   \
     ::);
 
-#if defined(__AVR_ATmega2560__)
+#if defined(ESP32)
+  #define GPIO_MASK32(pin) ( 1UL  << (( pin > 31 )? (pin - 32) : pin) )
+  #define GPIO_MASK64(pin) ( 1ULL << pin )
+
+  #define GPIO_SLCOUTS(pin) (( pin > 31 )? GPIO.out1_w1ts.val:GPIO.out_w1ts)
+  #define GPIO_SLCOUTC(pin) (( pin > 31 )? GPIO.out1_w1tc.val:GPIO.out_w1tc)
+
+  #define BUS_GPIO_MASK set_mask16d(0xFF,0xFF)
+
+  #define  CS_GPIO_MASK GPIO_MASK32( TFT_CS)
+  #define  RS_GPIO_MASK GPIO_MASK32( TFT_RS)
+  #define  WR_GPIO_MASK GPIO_MASK32( TFT_WR)
+  #define  RD_GPIO_MASK GPIO_MASK32( TFT_RD)
+  #define RST_GPIO_MASK GPIO_MASK32(TFT_RST)
+
+  #define INIT_TFT_DATA_BUS           \
+  for (int32_t c = 0; c<256; c++)     \
+  {                                   \
+  dbv_maskl[c] = 0;                   \
+  dbv_maskh[c] = 0;                   \
+  if ( c & 0x01 ) {/*00000001*/       \
+    dbv_maskl[c]  = (1UL << TFT_D0);  \
+    dbv_maskh[c]  = (1UL << TFT_D8);} \
+  if ( c & 0x02 ) {/*00000010*/       \
+    dbv_maskl[c] |= (1UL << TFT_D1);  \
+    dbv_maskh[c] |= (1UL << TFT_D9);} \
+  if ( c & 0x04 ) {/*00000100*/       \
+    dbv_maskl[c] |= (1UL << TFT_D2);  \
+    dbv_maskh[c] |= (1UL << TFT_D10);}\
+  if ( c & 0x08 ) {/*00001000*/       \
+    dbv_maskl[c] |= (1UL << TFT_D3);  \
+    dbv_maskh[c] |= (1UL << TFT_D11);}\
+  if ( c & 0x10 ) {/*00010000*/       \
+    dbv_maskl[c] |= (1UL << TFT_D4);  \
+    dbv_maskh[c] |= (1UL << TFT_D12);}\
+  if ( c & 0x20 ) {/*00100000*/       \
+    dbv_maskl[c] |= (1UL << TFT_D5);  \
+    dbv_maskh[c] |= (1UL << TFT_D13);}\
+  if ( c & 0x40 ) {/*01000000*/       \
+    dbv_maskl[c] |= (1UL << TFT_D6);  \
+    dbv_maskh[c] |= (1UL << TFT_D14);}\
+  if ( c & 0x80 ) {/*10000000*/       \
+    dbv_maskl[c] |= (1UL << TFT_D7);  \
+    dbv_maskh[c] |= (1UL << TFT_D15);}\
+  }
+  
+  #define SET_PIN_DIRECTION(bitmask, mode_)    \
+  io_conf.intr_type    = GPIO_INTR_DISABLE;    \
+  io_conf.mode         = mode_;                \
+  io_conf.pin_bit_mask = bitmask;              \
+  io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;\
+  io_conf.pull_up_en   = GPIO_PULLUP_DISABLE;  \
+  gpio_config(&io_conf)
+
+  #define SET_BUS_DIRECTION(mode) SET_PIN_DIRECTION(0xFFFFFFFFFFFFFFFF&BUS_GPIO_MASK, mode)
+  #define SET_CP_DIRECTION(mode)  SET_PIN_DIRECTION((GPIO_MASK64(TFT_CS)|GPIO_MASK64(TFT_RS)|GPIO_MASK64(TFT_RST)|GPIO_MASK64(TFT_WR)), mode)
+
+  #define set_mask8_low(C)  dbv_maskl[C]
+  #define set_mask8_high(C) dbv_maskh[C] 
+
+  #define set_mask16d(C,D) ((dbv_maskl[C])|dbv_maskh[D])
+  #define set_mask16(C)    (dbv_maskl[C&0xFF]|dbv_maskh[C>>8])
+  
+  #define write8(data)  WR_ACTIVE;GPIO.out_w1tc = BUS_GPIO_MASK;GPIO.out_w1ts = set_mask8_low(data);WR_IDLE
+  #define write_16(data) WR_ACTIVE;GPIO.out_w1tc = BUS_GPIO_MASK;GPIO.out_w1ts =    set_mask16(data);WR_IDLE 
+//  #define write16(d) { uint8_t h = (x)>>8, l = x; write8(h); write8(l); }
+  #define read_16(dst) {                                    \
+    RD_ACTIVE;                                              \
+    uint32_t rdbusgpioinputstemp_10354;                     \
+    rdbusgpioinputstemp_10354 = gpio_input_get();           \
+    rdbusgpioinputstemp_10354 = gpio_input_get();           \
+    rdbusgpioinputstemp_10354 = gpio_input_get();           \
+    RD_IDLE;                                                \
+    dst  = (((rdbusgpioinputstemp_10354>>TFT_D0)&1) << 0);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D1)&1) << 1);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D2)&1) << 2);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D3)&1) << 3);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D4)&1) << 4);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D5)&1) << 5);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D6)&1) << 6);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D7)&1) << 7);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D8)&1) << 8);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D9)&1) << 9);  \
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D10)&1) << 10);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D11)&1) << 11);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D12)&1) << 12);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D13)&1) << 13);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D14)&1) << 14);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D15)&1) << 15);\
+  }
+  #define read8(dst) {                                    \
+    RD_ACTIVE;                                            \
+    uint32_t rdbusgpioinputstemp_10354;                   \
+    rdbusgpioinputstemp_10354 = gpio_input_get();         \
+    rdbusgpioinputstemp_10354 = gpio_input_get();         \
+    rdbusgpioinputstemp_10354 = gpio_input_get();         \
+    RD_IDLE;                                              \
+    dst  = (((rdbusgpioinputstemp_10354>>TFT_D0)&1) << 0);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D1)&1) << 1);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D2)&1) << 2);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D3)&1) << 3);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D4)&1) << 4);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D5)&1) << 5);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D6)&1) << 6);\
+    dst |= (((rdbusgpioinputstemp_10354>>TFT_D7)&1) << 7);\
+  }
+//  #define read16(dst) { uint8_t hi; read8(hi); read8(dst); dst |= (hi << 8); }
+  #define setWriteDir() { SET_BUS_DIRECTION(GPIO_MODE_OUTPUT); }
+  #define setReadDir()  { SET_BUS_DIRECTION( GPIO_MODE_INPUT); }
+
+  unsigned long dbv_maskh[256];
+  unsigned long dbv_maskl[256];
+  
+  gpio_config_t io_conf;
+
+#elif defined(__AVR_ATmega2560__)
    #ifdef USE_ADAFRUIT_SHIELD_PIN
 	 #define RD_PORT PORTL
   	 #define WR_PORT PORTG
@@ -151,13 +266,27 @@
     #define CS_IDLE		csPort->PIO_SODR = csPinSet
 	#endif	
 #else
+#ifndef ESP32
  #error "Board type unsupported / not recognized"
+#endif
 #endif
 
 #if !defined(__SAM3X8E__)
 // Stuff common to all Arduino AVR board types:
+#ifdef ESP32
 
-#ifdef USE_ADAFRUIT_SHIELD_PIN
+#define WR_ACTIVE  GPIO.out_w1tc = WR_GPIO_MASK
+#define WR_IDLE    GPIO.out_w1ts = WR_GPIO_MASK
+#define RD_ACTIVE  GPIO.out_w1tc = RD_GPIO_MASK
+#define RD_IDLE    GPIO.out_w1ts = RD_GPIO_MASK
+#define CD_COMMAND GPIO_SLCOUTC(TFT_RS)  = RS_GPIO_MASK
+#define CD_DATA    GPIO_SLCOUTS(TFT_RS)  = RS_GPIO_MASK
+#define CS_ACTIVE  GPIO_SLCOUTC(TFT_CS)  = CS_GPIO_MASK
+#define CS_IDLE    GPIO_SLCOUTS(TFT_CS)  = CS_GPIO_MASK
+#define RST_ACTIVE GPIO_SLCOUTC(TFT_RST) = RST_GPIO_MASK
+#define RST_IDLE   GPIO_SLCOUTS(TFT_RST) = RST_GPIO_MASK
+
+#elif USE_ADAFRUIT_SHIELD_PIN
 
  // Control signals are ACTIVE LOW (idle is HIGH)
  // Command/Data: LOW = command, HIGH = data
@@ -170,7 +299,6 @@
  #define CD_DATA    CD_PORT |=  CD_MASK
  #define CS_ACTIVE  CS_PORT &= ~CS_MASK
  #define CS_IDLE    CS_PORT |=  CS_MASK
-
 #else // Breakout board
 
  // When using the TFT breakout board, control pins are configurable.
@@ -189,12 +317,12 @@
 // Data write strobe, ~2 instructions and always inline
 #define WR_STROBE { WR_ACTIVE; WR_IDLE; }
 #define RD_STROBE {RD_IDLE; RD_ACTIVE;RD_ACTIVE;RD_ACTIVE;}  
-#define write16(x) { write_16(x) }
-#define read16(dst) { read_16(dst) }
+#define write16(x) { write_16(x); }
+#define read16(dst) { read_16(dst); }
 #define writeCmd8(x){ CD_COMMAND; write8(x); CD_DATA;  }
-#define writeData8(x){  write8(x) }
+#define writeData8(x){  write8(x); }
 #define writeCmd16(x){ CD_COMMAND; write16(x); CD_DATA; }
-#define writeData16(x){ write16(x) }
+#define writeData16(x){ write16(x); }
 
 
 

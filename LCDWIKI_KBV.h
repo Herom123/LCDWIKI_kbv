@@ -15,8 +15,6 @@
 #elif defined(ESP8266)
  #include <pgmspace.h>
 #else
-#define pgm_read_byte(addr) (*(const unsigned char *)(addr))
-#define pgm_read_word(addr) (*(const unsigned short *)(addr))
 #endif
 #include "LCDWIKI_GUI.h"
 
@@ -24,7 +22,7 @@
 #define ID_932X    0
 #define ID_7575    1
 #define ID_9341    2
-#define ID_HX8357D    3
+#define ID_HX8357D 3
 #define ID_4535    4
 #define ID_9486    5
 #define ID_7735    6
@@ -62,8 +60,12 @@ typedef struct _lcd_info
 class LCDWIKI_KBV:public LCDWIKI_GUI
 {
 	public:
+	#ifndef ESP32
 	LCDWIKI_KBV(uint16_t model,uint8_t cs, uint8_t cd, uint8_t wr, uint8_t rd, uint8_t reset);
 	LCDWIKI_KBV(int16_t wid,int16_t heg,uint8_t cs, uint8_t cd, uint8_t wr, uint8_t rd, uint8_t reset);
+	#else
+	LCDWIKI_KBV(uint16_t model);
+	#endif
 	void Init_LCD(void);
 	void reset(void);
 	void start(uint16_t ID);

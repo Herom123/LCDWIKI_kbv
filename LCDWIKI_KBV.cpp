@@ -15,12 +15,14 @@
 #include "wiring_private.h"
 #include "LCDWIKI_KBV.h"
 #include "lcd_registers.h"
-#include "lcd_mode.h"
-#if (CONFIG_USE_8BIT_BUS==1)
+#include "config.h"
+
+#if (CONFIG_USE_8BIT_BUS==1) || !defined(CONFIG_USE_8BIT_BUS)
 #include "mcu_8bit_magic.h"
 #elif (CONFIG_USE_8BIT_BUS==0)
 #include "mcu_16bit_magic.h"
 #endif
+
 
 #define TFTLCD_DELAY16  0xFFFF
 #define TFTLCD_DELAY8   0x7F
@@ -62,65 +64,92 @@ lcd_info current_lcd_info[] =
 // Constructor for breakout board (configurable LCD control lines).
 // Can still use this w/shield, but parameters are ignored.
 // if modules is unreadable or you don't know the width and height of modules,you can use this constructor.
+#if defined(ESP32)
+LCDWIKI_KBV::LCDWIKI_KBV(uint16_t model)
+{
+	INIT_TFT_DATA_BUS;
+	SET_BUS_DIRECTION(GPIO_MODE_OUTPUT);
+	SET_CP_DIRECTION (GPIO_MODE_OUTPUT);
+
+ 	rotation = 0;
+ 	lcd_model = current_lcd_info[model].lcd_id;
+	WIDTH = current_lcd_info[model].lcd_wid;
+	HEIGHT = current_lcd_info[model].lcd_heg;
+
+    setWriteDir();
+ 	width = WIDTH;
+	height = HEIGHT;		
+
+	RST_IDLE;
+}
+#else
 LCDWIKI_KBV::LCDWIKI_KBV(uint16_t model,uint8_t cs, uint8_t cd, uint8_t wr, uint8_t rd, uint8_t reset)
-{	
-  #ifndef USE_ADAFRUIT_SHIELD_PIN
-	  // Convert pin numbers to registers and bitmasks
-	  _reset	 = reset;
-  #ifdef __AVR__
-		csPort	   = portOutputRegister(digitalPinToPort(cs));
-		cdPort	   = portOutputRegister(digitalPinToPort(cd));
-		wrPort	   = portOutputRegister(digitalPinToPort(wr));
-		rdPort	   = portOutputRegister(digitalPinToPort(rd));
-  #endif
-  #if defined(__SAM3X8E__)
-		csPort	   = digitalPinToPort(cs);
-		cdPort	   = digitalPinToPort(cd);
-		wrPort	   = digitalPinToPort(wr);
-		rdPort	   = digitalPinToPort(rd);
-  #endif
-	  csPinSet	 = digitalPinToBitMask(cs);
-	  cdPinSet	 = digitalPinToBitMask(cd);
-	  wrPinSet	 = digitalPinToBitMask(wr);
-	  rdPinSet	 = digitalPinToBitMask(rd);
-	  csPinUnset = ~csPinSet;
-	  cdPinUnset = ~cdPinSet;
-	  wrPinUnset = ~wrPinSet;
-	  rdPinUnset = ~rdPinSet;
-  #ifdef __AVR__
-		*csPort   |=  csPinSet; // Set all control bits to HIGH (idle)
-		*cdPort   |=  cdPinSet; // Signals are ACTIVE LOW
-		*wrPort   |=  wrPinSet;
-		*rdPort   |=  rdPinSet;
-  #endif
-  #if defined(__SAM3X8E__)
-		csPort->PIO_SODR  |=  csPinSet; // Set all control bits to HIGH (idle)
-		cdPort->PIO_SODR  |=  cdPinSet; // Signals are ACTIVE LOW
-		wrPort->PIO_SODR  |=  wrPinSet;
-		rdPort->PIO_SODR  |=  rdPinSet;
-  #endif
-	  pinMode(cs, OUTPUT);	  // Enable outputs
-	  pinMode(cd, OUTPUT);
-	  pinMode(wr, OUTPUT);
-	  pinMode(rd, OUTPUT);
-	  if(reset) 
-	  {
-		 digitalWrite(reset, HIGH);
-		 pinMode(reset, OUTPUT);
-	  }
-  #endif
-  #ifdef USE_ADAFRUIT_SHIELD_PIN 
-  	 CS_IDLE; // Set all control bits to idle state
- 	 WR_IDLE;
-  	 RD_IDLE;
-  	 CD_DATA;
- 	 digitalWrite(5, HIGH); // Reset line
- 	 pinMode(A3, OUTPUT);   // Enable outputs
- 	 pinMode(A2, OUTPUT);
- 	 pinMode(A1, OUTPUT);
- 	 pinMode(A0, OUTPUT);
-  	 pinMode( 5, OUTPUT);
- #endif
+{
+	#if !defined(ESP32)
+		#ifndef USE_ADAFRUIT_SHIELD_PIN
+			// Convert pin numbers to registers and bitmasks
+			_reset	 = reset;
+		#ifdef __AVR__
+				csPort	   = portOutputRegister(digitalPinToPort(cs));
+				cdPort	   = portOutputRegister(digitalPinToPort(cd));
+				wrPort	   = portOutputRegister(digitalPinToPort(wr));
+				rdPort	   = portOutputRegister(digitalPinToPort(rd));
+		#endif
+		#if defined(__SAM3X8E__)
+				csPort	   = digitalPinToPort(cs);
+				cdPort	   = digitalPinToPort(cd);
+				wrPort	   = digitalPinToPort(wr);
+				rdPort	   = digitalPinToPort(rd);
+		#endif
+			csPinSet	 = digitalPinToBitMask(cs);
+			cdPinSet	 = digitalPinToBitMask(cd);
+			wrPinSet	 = digitalPinToBitMask(wr);
+			rdPinSet	 = digitalPinToBitMask(rd);
+			csPinUnset = ~csPinSet;
+			cdPinUnset = ~cdPinSet;
+			wrPinUnset = ~wrPinSet;
+			rdPinUnset = ~rdPinSet;
+		#ifdef __AVR__
+				*csPort   |=  csPinSet; // Set all control bits to HIGH (idle)
+				*cdPort   |=  cdPinSet; // Signals are ACTIVE LOW
+				*wrPort   |=  wrPinSet;
+				*rdPort   |=  rdPinSet;
+		#endif
+		#if defined(__SAM3X8E__)
+				csPort->PIO_SODR  |=  csPinSet; // Set all control bits to HIGH (idle)
+				cdPort->PIO_SODR  |=  cdPinSet; // Signals are ACTIVE LOW
+				wrPort->PIO_SODR  |=  wrPinSet;
+				rdPort->PIO_SODR  |=  rdPinSet;
+		#endif
+			pinMode(cs, OUTPUT);	  // Enable outputs
+			pinMode(cd, OUTPUT);
+			pinMode(wr, OUTPUT);
+			pinMode(rd, OUTPUT);
+			if(reset) 
+			{
+				digitalWrite(reset, HIGH);
+				pinMode(reset, OUTPUT);
+			}
+		#endif
+		#ifdef USE_ADAFRUIT_SHIELD_PIN 
+			CS_IDLE; // Set all control bits to idle state
+			WR_IDLE;
+			RD_IDLE;
+			CD_DATA;
+			digitalWrite(5, HIGH); // Reset line
+			pinMode(A3, OUTPUT);   // Enable outputs
+			pinMode(A2, OUTPUT);
+			pinMode(A1, OUTPUT);
+			pinMode(A0, OUTPUT);
+			pinMode( 5, OUTPUT);
+		#endif
+	#else
+		INIT_TFT_DATA_BUS;
+		SET_BUS_DIRECTION(GPIO_MODE_OUTPUT);
+		SET_CP_DIRECTION (GPIO_MODE_OUTPUT);
+		RST_ACTIVE;RST_IDLE;
+	#endif
+
  	rotation = 0;
  	lcd_model = current_lcd_info[model].lcd_id;
 	WIDTH = current_lcd_info[model].lcd_wid;
@@ -225,7 +254,7 @@ LCDWIKI_KBV::LCDWIKI_KBV(int16_t wid,int16_t heg,uint8_t cs, uint8_t cd, uint8_t
  	width = WIDTH;
 	height = HEIGHT;		
 }
-
+#endif
 // Initialization lcd modules
 void LCDWIKI_KBV::Init_LCD(void)
 {
@@ -255,7 +284,11 @@ void LCDWIKI_KBV::reset(void)
   digitalWrite(5, HIGH);
 //  delay(100);
   //digitalWrite(5, LOW);
- // delay(100);
+ // delay(100)
+#elif ESP32
+	RST_ACTIVE;
+	delay(2);
+	RST_IDLE;
 #else
   if(_reset) 
   {
